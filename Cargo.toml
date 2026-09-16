@@ -1,0 +1,45 @@
+[workspace]
+resolver = "2"
+members = ["crates/airctx-core", "crates/airctx-server", "crates/airctx-client", "crates/airctx"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+airctx-core = { path = "crates/airctx-core" }
+airctx-server = { path = "crates/airctx-server" }
+airctx-client = { path = "crates/airctx-client" }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "sync", "time", "net", "io-util"] }
+axum = "0.8"
+tokio-stream = { version = "0.1", features = ["sync"] }
+rusqlite = { version = "0.33", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand = "0.8"
+sha2 = "0.10"
+subtle = "2"
+hex = "0.4"
+ureq = "2"
+anyhow = "1"
+dirs = "5"
+humantime = "2"
+ratatui = "0.29"
+crossterm = "0.28"
+unicode-width = "0.2"
+notify = "6"
+walkdir = "2"
+
+# 发布产物追求小体积
+[profile.release]
+opt-level = "z"
+lto = true
+strip = true
+codegen-units = 1
+panic = "abort"

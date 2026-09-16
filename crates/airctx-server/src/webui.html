@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AirCtx</title>
+<style>
+:root { --bg:#0f1115; --panel:#161a22; --line:#262c3a; --fg:#e6e9f0; --dim:#8b93a7; --accent:#22d3ee; --ok:#34d399; --err:#f87171; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--fg); font:14px/1.5 ui-sans-serif,system-ui,sans-serif; }
+header { display:flex; align-items:center; gap:12px; padding:14px 22px; border-bottom:1px solid var(--line); }
+.logo { font-weight:700; color:var(--accent); letter-spacing:.3px; }
+.dim { color:var(--dim); }
+.ok { color:var(--ok); }
+.err { color:var(--err); }
+main { max-width:880px; margin:0 auto; padding:28px 22px; }
+.card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:22px; margin-bottom:16px; }
+input { width:100%; padding:10px 12px; margin:6px 0 14px; background:#0f1115; color:var(--fg); border:1px solid var(--line); border-radius:8px; font:inherit; }
+button { background:var(--accent); color:#04232a; border:0; border-radius:8px; padding:9px 16px; font-weight:650; cursor:pointer; }
+button.ghost { background:transparent; color:var(--fg); border:1px solid var(--line); }
+button.danger { background:transparent; color:var(--err); border:1px solid var(--err); }
+.row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.token { font-family:ui-monospace,monospace; background:#0f1115; padding:10px 12px; border-radius:8px; word-break:break-all; border:1px solid var(--line); }
+table { width:100%; border-collapse:collapse; }
+td,th { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); font-size:13px; }
+.hidden { display:none; }
+h1 { font-size:18px; margin:0 0 8px; }
+h2 { font-size:15px; margin:0 0 12px; color:var(--dim); font-weight:600; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">AirCtx</div>
+  <div class="dim" id="who"></div>
+  <div class="row" style="margin-left:auto" id="nav"></div>
+</header>
+<main id="app"></main>
+<script>
+const $ = s => document.querySelector(s);
+function root() {
+  let p = location.pathname;
+  if (!p.endsWith('/')) p += '/';
+  return p;
+}
+async function api(method, path, body) {
+  const opt = { method, headers: {}, credentials: 'same-origin' };
+  if (body !== undefined) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  const res = await fetch(root() + path, opt);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+function inviteCode() {
+  const q = new URLSearchParams(location.search);
+  return q.get('invite') || '';
+}
+
+let me = null;
+
+async function boot() {
+  try { me = await api('GET', 'api/me'); renderApp(); }
+  catch { me = null; renderAuth(); }
+}
+
+function renderAuth() {
+  $('#who').textContent = '';
+  $('#nav').innerHTML = '';
+  const inv = inviteCode();
+  api('GET', 'api/status').then(st => {
+    const canReg = st.open_register || !!inv;
+    $('#app').innerHTML = `
+      <div class="card">
+        <h1>${st.open_register ? 'Create the admin account' : 'Sign in'}</h1>
+        <p class="dim">${st.open_register
+          ? 'First user becomes admin. Registration closes after this.'
+          : (inv ? 'You have an invite. Create your account.' : 'Ask an admin for an invite link to register.')}</p>
+        <div id="msg" class="err"></div>
+        <form id="form">
+          <label class="dim">username</label>
+          <input name="username" autocomplete="username" required>
+          <label class="dim">password</label>
+          <input name="password" type="password" autocomplete="current-password" required>
+          ${inv ? `<input type="hidden" name="invite" value="${inv}">` : ''}
+          <div class="row">
+            ${canReg ? '<button type="submit" name="reg" value="1">Register</button>' : ''}
+            ${st.open_register ? '' : '<button type="submit">Sign in</button>'}
+          </div>
+        </form>
+      </div>`;
+    $('#form').onsubmit = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = { username: fd.get('username'), password: fd.get('password'), invite: fd.get('invite') || inv || undefined };
+      const isReg = e.submitter && e.submitter.name === 'reg' || st.open_register;
+      $('#msg').textContent = '';
+      try {
+        await api('POST', isReg ? 'api/register' : 'api/login', body);
+        location.search = '';
+        await boot();
+      } catch (err) { $('#msg').textContent = err.message; }
+    };
+  }).catch(err => { $('#app').innerHTML = `<p class="err">${err.message}</p>`; });
+}
+
+function renderApp() {
+  $('#who').textContent = me.username + (me.is_admin ? ' · admin' : '');
+  $('#nav').innerHTML = `<button class="ghost" id="out">Sign out</button>`;
+  $('#out').onclick = async () => { await api('POST', 'api/logout', {}); location.reload(); };
+  $('#app').innerHTML = `
+    <div class="card">
+      <h2>CLI token — paste into airctx login</h2>
+      <p class="dim">On the client: <code>airctx login ${location.origin}${location.pathname.replace(/\/$/,'')} TOKEN</code></p>
+      <div class="token" id="tok">${me.api_token}</div>
+      <div class="row" style="margin-top:10px"><button class="ghost" id="copy">Copy token</button></div>
+    </div>
+    ${me.is_admin ? `
+    <div class="card">
+      <h2>Invite someone</h2>
+      <p class="dim">Registration is closed. Share a one-time invite link.</p>
+      <button id="inv">Generate invite link</button>
+      <div id="invout" style="margin-top:12px"></div>
+    </div>` : ''}
+    <div class="card">
+      <h2>Context</h2>
+      <div class="row">
+        <input id="prefix" placeholder="prefix filter, e.g. devices/" style="flex:1;margin:0">
+        <button class="ghost" id="reload">Refresh</button>
+      </div>
+      <div id="list" style="margin-top:12px"></div>
+    </div>
+    <div class="card hidden" id="preview"></div>`;
+  $('#copy').onclick = () => navigator.clipboard.writeText(me.api_token).then(() => {
+    const b = $('#copy');
+    b.textContent = 'Copied';
+    setTimeout(() => { b.textContent = 'Copy token'; }, 1200);
+  });
+  if (me.is_admin) $('#inv').onclick = async () => {
+    try {
+      const r = await api('POST', 'api/invite', {});
+      $('#invout').innerHTML = `<div class="token">${r.url}</div>`;
+    } catch (e) { $('#invout').innerHTML = `<span class="err">${e.message}</span>`; }
+  };
+  $('#reload').onclick = loadList;
+  $('#prefix').onkeydown = e => { if (e.key === 'Enter') loadList(); };
+  loadList();
+}
+
+async function loadList() {
+  const prefix = $('#prefix').value.trim();
+  const q = prefix ? `?prefix=${encodeURIComponent(prefix)}` : '';
+  try {
+    const items = await api('GET', 'api/kv' + q);
+    if (!items.length) { $('#list').innerHTML = '<p class="dim">empty</p>'; return; }
+    $('#list').innerHTML = `<table><tr><th>key</th><th>size</th><th></th></tr>${
+      items.map(it => `<tr>
+        <td><a href="#" data-k="${encodeURIComponent(it.key)}">${esc(it.key)}</a></td>
+        <td class="dim">${it.size}</td>
+        <td><button class="danger" data-del="${encodeURIComponent(it.key)}">delete</button></td>
+      </tr>`).join('')
+    }</table>`;
+    $('#list').querySelectorAll('a[data-k]').forEach(a => a.onclick = ev => { ev.preventDefault(); openKey(decodeURIComponent(a.dataset.k)); });
+    $('#list').querySelectorAll('button[data-del]').forEach(b => b.onclick = async () => {
+      if (!confirm('delete ' + decodeURIComponent(b.dataset.del) + '?')) return;
+      await api('DELETE', 'api/kv?key=' + b.dataset.del);
+      loadList();
+    });
+  } catch (e) { $('#list').innerHTML = `<p class="err">${e.message}</p>`; }
+}
+
+async function openKey(key) {
+  const box = $('#preview');
+  box.classList.remove('hidden');
+  try {
+    const r = await api('GET', 'api/item?key=' + encodeURIComponent(key));
+    box.innerHTML = `<h2>${esc(key)}</h2><pre style="white-space:pre-wrap;max-height:420px;overflow:auto">${esc(r.text || '')}</pre>`;
+  } catch (e) { box.innerHTML = `<p class="err">${e.message}</p>`; }
+}
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+boot();
+</script>
+</body>
+</html>

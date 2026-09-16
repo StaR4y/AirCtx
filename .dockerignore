@@ -1,0 +1,9 @@
+target
+data
+*.db
+*.db-wal
+*.db-shm
+npm
+.git
+serve.log
+daemon.log

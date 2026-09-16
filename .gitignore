@@ -1,0 +1,8 @@
+/target
+data/
+*.db
+*.db-wal
+*.db-shm
+.env
+*.log
+.DS_Store

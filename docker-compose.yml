@@ -1,0 +1,18 @@
+services:
+  airctx:
+    build: .
+    container_name: airctx
+    ports:
+      - "8787:8787"
+    volumes:
+      - airctx-data:/data
+    restart: unless-stopped
+    mem_limit: 256m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  airctx-data:

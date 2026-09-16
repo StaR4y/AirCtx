@@ -1,0 +1,26 @@
+{
+  "name": "airctx",
+  "version": "0.1.0",
+  "description": "AirCtx — lightweight context sharing (interactive CLI + background sync daemon)",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://example.com/airctx"
+  },
+  "bin": {
+    "airctx": "./bin/airctx.js"
+  },
+  "files": [
+    "bin/"
+  ],
+  "optionalDependencies": {
+    "@airctx/cli-darwin-arm64": "0.1.0",
+    "@airctx/cli-darwin-x64": "0.1.0",
+    "@airctx/cli-linux-arm64": "0.1.0",
+    "@airctx/cli-linux-x64": "0.1.0",
+    "@airctx/cli-win32-x64": "0.1.0"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
